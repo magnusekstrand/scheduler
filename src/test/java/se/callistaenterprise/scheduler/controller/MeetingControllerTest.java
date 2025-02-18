@@ -48,9 +48,12 @@ class MeetingControllerTest {
         when(meetingMapper.mapToMeetingDto(any(Meeting.class))).thenReturn(responseDto);
         when(meetingService.addMeeting(any(Meeting.class))).thenReturn(meeting);
 
+        String requestJson = objectMapper.writeValueAsString(requestDto);
+        System.out.println(requestJson);
+
         mockMvc.perform(post("/api/scheduler/meetings")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(requestDto)))
+                        .content(requestJson))
                 .andExpect(status().isOk());
     }
 

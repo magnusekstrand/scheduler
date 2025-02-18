@@ -15,6 +15,7 @@ import se.callistaenterprise.scheduler.mapping.MeetingMapper;
 import se.callistaenterprise.scheduler.model.Meeting;
 import se.callistaenterprise.scheduler.service.MeetingService;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Slf4j
@@ -54,6 +55,17 @@ public class MeetingController {
         try {
             return ResponseEntity.ok(meetingMapper.mapToMeetingDto(
                 meetingService.addMeeting(meetingMapper.mapToMeeting(meetingDto))));
+        } catch (BadRequestException e) {
+            log.error(e.getMessage());
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @PostMapping("/meetings/{date}/{meetingTimeInMinutes}")
+    public ResponseEntity<List<MeetingDto>> addMeetingByDuration(@PathVariable LocalDate date, @PathVariable Long meetingTimeInMinutes) {
+        try {
+            List<Meeting> meetings = meetingService.addMeeting(date, meetingTimeInMinutes);
+            return ResponseEntity.ok(meetings.stream().map(meetingMapper::mapToMeetingDto).toList());
         } catch (BadRequestException e) {
             log.error(e.getMessage());
             return new ResponseEntity<>(HttpStatus.BAD_REQUEST);

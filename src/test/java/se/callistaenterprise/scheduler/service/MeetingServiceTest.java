@@ -193,4 +193,64 @@ class MeetingServiceTest {
         }
     }
 
+    @Test
+    void testAddMeetingByDurationFindsAvailableSlots() {
+        try (MockedStatic<MeetingStorage> mockedStatic = mockStatic(MeetingStorage.class)) {
+            LocalDate date = LocalDate.of(2023, 10, 10);
+            Long meetingTimeInMinutes = 30L;
+
+            List<Meeting> existingMeetings = List.of(
+                    Meeting.builder().title("Morning Meeting").date(date).start(LocalTime.of(9, 0)).end(LocalTime.of(9, 30)).build(),
+                    Meeting.builder().title("Late Morning Meeting").date(date).start(LocalTime.of(11, 0)).end(LocalTime.of(11, 30)).build(),
+                    Meeting.builder().title("Afternoon Meeting").date(date).start(LocalTime.of(15, 0)).end(LocalTime.of(15, 45)).build()
+            );
+
+            mockedStatic.when(MeetingStorage::findAll).thenReturn(existingMeetings);
+
+            List<Meeting> availableSlots = meetingService.addMeeting(date, meetingTimeInMinutes);
+
+            assertNotNull(availableSlots);
+            assertEquals(3, availableSlots.size());
+            assertEquals(LocalTime.of(9, 30), availableSlots.get(0).getStart());
+            assertEquals(LocalTime.of(11, 0), availableSlots.get(0).getEnd());
+        }
+    }
+
+    @Test
+    void testAddMeetingByDurationNoAvailableSlots() {
+        try (MockedStatic<MeetingStorage> mockedStatic = mockStatic(MeetingStorage.class)) {
+            LocalDate date = LocalDate.of(2023, 10, 10);
+            Long meetingTimeInMinutes = 60L;
+
+            List<Meeting> existingMeetings = List.of(
+                    Meeting.builder().title("Morning Meeting").date(date).start(LocalTime.of(9, 0)).end(LocalTime.of(9, 30)).build(),
+                    Meeting.builder().title("Late Morning Meeting").date(date).start(LocalTime.of(9, 45)).end(LocalTime.of(13, 30)).build(),
+                    Meeting.builder().title("Afternoon Meeting").date(date).start(LocalTime.of(14, 0)).end(LocalTime.of(16, 45)).build()
+            );
+
+            mockedStatic.when(MeetingStorage::findAll).thenReturn(existingMeetings);
+
+            List<Meeting> availableSlots = meetingService.addMeeting(date, meetingTimeInMinutes);
+
+            assertNotNull(availableSlots);
+            assertEquals(0, availableSlots.size());
+        }
+    }
+
+    @Test
+    void testAddMeetingByDurationWithEmptyCalendar() {
+        try (MockedStatic<MeetingStorage> mockedStatic = mockStatic(MeetingStorage.class)) {
+            LocalDate date = LocalDate.of(2023, 10, 10);
+            Long meetingTimeInMinutes = 30L;
+
+            mockedStatic.when(MeetingStorage::findAll).thenReturn(List.of());
+
+            List<Meeting> availableSlots = meetingService.addMeeting(date, meetingTimeInMinutes);
+
+            assertNotNull(availableSlots);
+            assertEquals(1, availableSlots.size());
+            assertEquals(LocalTime.of(9, 0), availableSlots.get(0).getStart());
+            assertEquals(LocalTime.of(17, 0), availableSlots.get(0).getEnd());
+        }
+    }
 }

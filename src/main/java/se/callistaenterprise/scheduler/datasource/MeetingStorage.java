@@ -2,20 +2,20 @@ package se.callistaenterprise.scheduler.datasource;
 
 import se.callistaenterprise.scheduler.model.Meeting;
 
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static se.callistaenterprise.scheduler.service.MeetingService.dateComparator;
+import static se.callistaenterprise.scheduler.service.MeetingService.timeComparator;
+
 public class MeetingStorage {
 
-    private static final AtomicLong id = new AtomicLong();
+    private static final AtomicLong id = new AtomicLong(1L);
     private static final Set<Meeting> meetings = new HashSet<>();
 
     public static List<Meeting> findAll() {
-        final Comparator<Meeting> dateComparator = (o1, o2) -> o1.getDate().compareTo(o2.getDate());
-        final Comparator<Meeting> timeComparator = (o1, o2) -> o1.getStart().compareTo(o2.getStart());
         return meetings.stream().sorted(dateComparator.thenComparing(timeComparator)).toList();
     }
 
