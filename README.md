@@ -13,6 +13,18 @@
 * Nothing stops you to add a meeting i the past
 * Nothing stops you to schedule meetings on weekends and holidays
 
+## Build application
+
+```
+./mvnw clean install
+```
+
+## Run application
+
+```
+./mvnw spring-boot:run
+```
+
 ## Request examples
 
 To get a pretty print of JSON response I utilise **jq**. It is a popular JSON tool in the Unix/Linux environment, also described as "sed for JSON data."
