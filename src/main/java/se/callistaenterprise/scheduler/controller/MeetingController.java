@@ -61,8 +61,8 @@ public class MeetingController {
         }
     }
 
-    @PostMapping("/meetings/{date}/{meetingTimeInMinutes}")
-    public ResponseEntity<List<MeetingDto>> addMeetingByDuration(@PathVariable LocalDate date, @PathVariable Long meetingTimeInMinutes) {
+    @GetMapping("/meetings/{date}/{meetingTimeInMinutes}")
+    public ResponseEntity<List<MeetingDto>> getMeetingByDuration(@PathVariable LocalDate date, @PathVariable Long meetingTimeInMinutes) {
         try {
             List<Meeting> meetings = meetingService.addMeeting(date, meetingTimeInMinutes);
             return ResponseEntity.ok(meetings.stream().map(meetingMapper::mapToMeetingDto).toList());
