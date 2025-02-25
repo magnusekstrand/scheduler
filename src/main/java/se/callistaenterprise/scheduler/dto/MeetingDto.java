@@ -10,7 +10,9 @@ import java.time.LocalTime;
 @Builder
 public class MeetingDto {
     private Long id;
+
     private String title;
+
     private LocalDate date;
     private LocalTime start;
     private LocalTime end;

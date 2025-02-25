@@ -2,7 +2,7 @@ package se.callistaenterprise.scheduler.datasource;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import se.callistaenterprise.scheduler.model.Meeting;
+import se.callistaenterprise.scheduler.entity.Meeting;
 
 import java.time.LocalDate;
 import java.time.LocalTime;

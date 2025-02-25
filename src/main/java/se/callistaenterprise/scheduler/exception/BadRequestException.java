@@ -1,11 +1,20 @@
 package se.callistaenterprise.scheduler.exception;
 
-import org.springframework.http.HttpStatusCode;
-import org.springframework.web.client.HttpStatusCodeException;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.ResponseStatus;
 
-public class BadRequestException extends HttpStatusCodeException {
-
-    public BadRequestException(String statusText) {
-        super(HttpStatusCode.valueOf(400), statusText, null, null, null);
+@ResponseStatus(value = HttpStatus.BAD_REQUEST)
+public class BadRequestException extends RuntimeException {
+    public BadRequestException() {
+        super();
+    }
+    public BadRequestException(String message, Throwable cause) {
+        super(message, cause);
+    }
+    public BadRequestException(String message) {
+        super(message);
+    }
+    public BadRequestException(Throwable cause) {
+        super(cause);
     }
 }

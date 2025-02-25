@@ -7,10 +7,11 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.validation.Errors;
 import se.callistaenterprise.scheduler.dto.MeetingDto;
-import se.callistaenterprise.scheduler.exception.BadRequestException;
+import se.callistaenterprise.scheduler.entity.Meeting;
 import se.callistaenterprise.scheduler.mapping.MeetingMapper;
-import se.callistaenterprise.scheduler.model.Meeting;
+import se.callistaenterprise.scheduler.model.Either;
 import se.callistaenterprise.scheduler.service.MeetingService;
 
 import java.time.LocalDate;
@@ -18,10 +19,12 @@ import java.time.LocalTime;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static se.callistaenterprise.scheduler.model.Either.right;
 
 @WebMvcTest(MeetingController.class)
 class MeetingControllerTest {
@@ -46,7 +49,7 @@ class MeetingControllerTest {
 
         when(meetingMapper.mapToMeeting(any(MeetingDto.class))).thenReturn(meeting);
         when(meetingMapper.mapToMeetingDto(any(Meeting.class))).thenReturn(responseDto);
-        when(meetingService.addMeeting(any(Meeting.class))).thenReturn(meeting);
+        when(meetingService.addMeeting(any(Meeting.class))).thenReturn(Either.left(meeting));
 
         String requestJson = objectMapper.writeValueAsString(requestDto);
         System.out.println(requestJson);
@@ -62,7 +65,7 @@ class MeetingControllerTest {
         Meeting meeting = Meeting.builder().id(1L).title("Team Meeting").date(LocalDate.now()).start(LocalTime.of(10, 0)).end(LocalTime.of(11, 0)).build();
         MeetingDto responseDto = new MeetingDto(1L, "Team Meeting", LocalDate.now(), LocalTime.of(10, 0), LocalTime.of(11, 0));
 
-        when(meetingService.getMeeting(1L)).thenReturn(meeting);
+        when(meetingService.getMeeting(1L)).thenReturn(Either.left(meeting));
         when(meetingMapper.mapToMeetingDto(meeting)).thenReturn(responseDto);
 
         mockMvc.perform(get("/api/scheduler/meetings/1")
@@ -72,7 +75,9 @@ class MeetingControllerTest {
 
     @Test
     void getMeeting_shouldReturnNotFound_whenMeetingDoesNotExist() throws Exception {
-        when(meetingService.getMeeting(1L)).thenReturn(null);
+        Errors errors = mock(Errors.class);
+        when(errors.hasErrors()).thenReturn(true);
+        when(meetingService.getMeeting(1L)).thenReturn(right(errors));
 
         mockMvc.perform(get("/api/scheduler/meetings/1")
                         .contentType(MediaType.APPLICATION_JSON))
@@ -80,19 +85,12 @@ class MeetingControllerTest {
     }
 
     @Test
-    void getMeeting_shouldReturnBadRequest_whenBadRequestOccurs() throws Exception {
-        when(meetingService.getMeeting(-1L)).thenThrow(new BadRequestException("Invalid meeting ID"));
-
-        mockMvc.perform(get("/api/scheduler/meetings/-1")
-                        .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
     void addMeeting_shouldReturnBadRequest_whenMeetingIsInvalid() throws Exception {
         MeetingDto invalidMeetingDto = new MeetingDto(null, null, null, null, null);
+        Errors errors = mock(Errors.class);
 
-        when(meetingMapper.mapToMeeting(any(MeetingDto.class))).thenThrow(new BadRequestException("Invalid meeting data"));
+        when(errors.hasErrors()).thenReturn(true);
+        when(meetingService.addMeeting(any())).thenReturn(right(errors));
 
         mockMvc.perform(post("/api/scheduler/meetings")
                         .contentType(MediaType.APPLICATION_JSON)

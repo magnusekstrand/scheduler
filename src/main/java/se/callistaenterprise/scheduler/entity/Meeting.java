@@ -1,4 +1,4 @@
-package se.callistaenterprise.scheduler.model;
+package se.callistaenterprise.scheduler.entity;
 
 import lombok.Builder;
 import lombok.Data;

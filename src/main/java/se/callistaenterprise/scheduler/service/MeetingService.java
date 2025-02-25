@@ -2,9 +2,12 @@ package se.callistaenterprise.scheduler.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.validation.Errors;
 import se.callistaenterprise.scheduler.datasource.MeetingStorage;
-import se.callistaenterprise.scheduler.exception.BadRequestException;
-import se.callistaenterprise.scheduler.model.Meeting;
+import se.callistaenterprise.scheduler.entity.Meeting;
+import se.callistaenterprise.scheduler.model.Either;
+import se.callistaenterprise.scheduler.validation.SchedulerErrors;
+import se.callistaenterprise.scheduler.validation.validators.MeetingValidator;
 
 import java.time.Duration;
 import java.time.LocalDate;
@@ -13,7 +16,10 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-import static se.callistaenterprise.scheduler.service.MeetingValidator.validate;
+import static se.callistaenterprise.scheduler.model.Either.left;
+import static se.callistaenterprise.scheduler.model.Either.right;
+import static se.callistaenterprise.scheduler.validation.SchedulerErrors.ErrorCode.TIME_NOT_AVAILABLE;
+import static se.callistaenterprise.scheduler.validation.Validator.validate;
 
 @Slf4j
 @Service
@@ -29,26 +35,31 @@ public class MeetingService {
         return MeetingStorage.findAll().stream().sorted(dateComparator.thenComparing(timeComparator)).toList();
     }
 
-    public Meeting getMeeting(Long id) {
+    public Either<Meeting, Errors> getMeeting(Long id) {
         if (id == null) {
-            throw new BadRequestException("id cannot be null");
+            return right(SchedulerErrors.createErrors(id, "id", SchedulerErrors.ErrorCode.FIELD_INVALID, "id cannot be null"));
         }
 
         Meeting meeting = MeetingStorage.find(id);
         if (meeting == null) {
-            log.info("Cannot find meeting with id = {}", id);
+            return right(SchedulerErrors.createErrors(id, "id", SchedulerErrors.ErrorCode.RESOURCE_NOT_FOUND, "Cannot find meeting with id = " + id));
         }
-        return meeting;
+
+        return left(meeting);
     }
 
-    public Meeting addMeeting(Meeting meeting) throws BadRequestException {
-        validate(meeting);
-
-        if (isTimeAvailable(meeting)) {
-            return MeetingStorage.insert(meeting);
+    public Either<Meeting, Errors> addMeeting(Meeting meeting) {
+        Errors errors = validate(meeting, new MeetingValidator());
+        if (errors.hasErrors()) {
+            return right(errors);
         }
 
-        throw new BadRequestException("Meeting time is not available");
+        if (isTimeAvailable(meeting)) {
+            return left(MeetingStorage.insert(meeting));
+        }
+
+        errors.reject(TIME_NOT_AVAILABLE.name());
+        return right(errors);
     }
 
     public List<Meeting> addMeeting(LocalDate date, Long meetingTimeInMinutes) {

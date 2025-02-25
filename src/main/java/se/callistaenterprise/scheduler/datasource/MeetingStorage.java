@@ -1,6 +1,6 @@
 package se.callistaenterprise.scheduler.datasource;
 
-import se.callistaenterprise.scheduler.model.Meeting;
+import se.callistaenterprise.scheduler.entity.Meeting;
 
 import java.util.HashSet;
 import java.util.List;

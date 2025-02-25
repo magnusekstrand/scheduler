@@ -1,18 +1,21 @@
 package se.callistaenterprise.scheduler.controller;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.Errors;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import se.callistaenterprise.scheduler.dto.MeetingDto;
 import se.callistaenterprise.scheduler.exception.BadRequestException;
+import se.callistaenterprise.scheduler.exception.NotFoundException;
 import se.callistaenterprise.scheduler.mapping.MeetingMapper;
-import se.callistaenterprise.scheduler.model.Meeting;
+import se.callistaenterprise.scheduler.entity.Meeting;
+import se.callistaenterprise.scheduler.model.Either;
 import se.callistaenterprise.scheduler.service.MeetingService;
 
 import java.time.LocalDate;
@@ -38,37 +41,26 @@ public class MeetingController {
 
     @GetMapping("/meetings/{id}")
     public ResponseEntity<MeetingDto> getMeeting(@PathVariable Long id) {
-        try {
-            Meeting meeting = meetingService.getMeeting(id);
-            if (meeting == null) {
-                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-            }
-            return ResponseEntity.ok(meetingMapper.mapToMeetingDto(meeting));
-        } catch (BadRequestException e) {
-            log.error(e.getMessage());
-            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        Either<Meeting, Errors> response = meetingService.getMeeting(id) ;
+        if (response.hasErrors()) {
+            throw new NotFoundException("Meeting not found, id = " + id);
         }
+        return ResponseEntity.ok(meetingMapper.mapToMeetingDto(response.getLeft()));
+    }
+
+    @GetMapping("/meetings/duration")
+    public ResponseEntity<List<MeetingDto>> getAvailableMeetingsByDuration(@RequestParam("date") LocalDate date, @RequestParam("duration") Long meetingInMinutes) {
+        List<MeetingDto> response = meetingService.addMeeting(date, meetingInMinutes).stream()
+            .map(meetingMapper::mapToMeetingDto).toList();
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/meetings")
     public ResponseEntity<MeetingDto> addMeeting(@RequestBody MeetingDto meetingDto) {
-        try {
-            return ResponseEntity.ok(meetingMapper.mapToMeetingDto(
-                meetingService.addMeeting(meetingMapper.mapToMeeting(meetingDto))));
-        } catch (BadRequestException e) {
-            log.error(e.getMessage());
-            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        Either<Meeting, Errors> response = meetingService.addMeeting(meetingMapper.mapToMeeting(meetingDto));
+        if (response.hasErrors()) {
+            throw new BadRequestException(response.getAllErrors().toString());
         }
-    }
-
-    @GetMapping("/meetings/{date}/{meetingTimeInMinutes}")
-    public ResponseEntity<List<MeetingDto>> getMeetingByDuration(@PathVariable LocalDate date, @PathVariable Long meetingTimeInMinutes) {
-        try {
-            List<Meeting> meetings = meetingService.addMeeting(date, meetingTimeInMinutes);
-            return ResponseEntity.ok(meetings.stream().map(meetingMapper::mapToMeetingDto).toList());
-        } catch (BadRequestException e) {
-            log.error(e.getMessage());
-            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-        }
+        return ResponseEntity.ok(meetingMapper.mapToMeetingDto(response.getLeft()));
     }
 }

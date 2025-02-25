@@ -5,7 +5,7 @@ import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.stereotype.Component;
 import se.callistaenterprise.scheduler.datasource.MeetingStorage;
-import se.callistaenterprise.scheduler.model.Meeting;
+import se.callistaenterprise.scheduler.entity.Meeting;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
