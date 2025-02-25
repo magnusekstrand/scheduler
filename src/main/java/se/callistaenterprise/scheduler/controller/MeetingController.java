@@ -1,5 +1,7 @@
 package se.callistaenterprise.scheduler.controller;
 
+import java.time.LocalDate;
+import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.Errors;
@@ -11,56 +13,57 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import se.callistaenterprise.scheduler.dto.MeetingDto;
+import se.callistaenterprise.scheduler.entity.Meeting;
 import se.callistaenterprise.scheduler.exception.BadRequestException;
 import se.callistaenterprise.scheduler.exception.NotFoundException;
 import se.callistaenterprise.scheduler.mapping.MeetingMapper;
-import se.callistaenterprise.scheduler.entity.Meeting;
 import se.callistaenterprise.scheduler.model.Either;
 import se.callistaenterprise.scheduler.service.MeetingService;
-
-import java.time.LocalDate;
-import java.util.List;
 
 @Slf4j
 @RestController
 @RequestMapping("/api/scheduler")
 public class MeetingController {
 
-    private final MeetingService meetingService;
-    private final MeetingMapper meetingMapper;
+  private final MeetingService meetingService;
+  private final MeetingMapper meetingMapper;
 
-    public MeetingController(MeetingService meetingService, MeetingMapper meetingMapper) {
-        this.meetingService = meetingService;
-        this.meetingMapper = meetingMapper;
-    }
+  public MeetingController(MeetingService meetingService, MeetingMapper meetingMapper) {
+    this.meetingService = meetingService;
+    this.meetingMapper = meetingMapper;
+  }
 
-    @GetMapping("/meetings")
-    public List<MeetingDto> getMeetings() {
-        return meetingService.getMeetings().stream().map(meetingMapper::mapToMeetingDto).toList();
-    }
+  @GetMapping("/meetings")
+  public List<MeetingDto> getMeetings() {
+    return meetingService.getMeetings().stream().map(meetingMapper::mapToMeetingDto).toList();
+  }
 
-    @GetMapping("/meetings/{id}")
-    public ResponseEntity<MeetingDto> getMeeting(@PathVariable Long id) {
-        Either<Meeting, Errors> response = meetingService.getMeeting(id) ;
-        if (response.hasErrors()) {
-            throw new NotFoundException("Meeting not found, id = " + id);
-        }
-        return ResponseEntity.ok(meetingMapper.mapToMeetingDto(response.getLeft()));
+  @GetMapping("/meetings/{id}")
+  public ResponseEntity<MeetingDto> getMeeting(@PathVariable Long id) {
+    Either<Meeting, Errors> response = meetingService.getMeeting(id);
+    if (response.hasErrors()) {
+      throw new NotFoundException("Meeting not found, id = " + id);
     }
+    return ResponseEntity.ok(meetingMapper.mapToMeetingDto(response.getLeft()));
+  }
 
-    @GetMapping("/meetings/duration")
-    public ResponseEntity<List<MeetingDto>> getAvailableMeetingsByDuration(@RequestParam("date") LocalDate date, @RequestParam("duration") Long meetingInMinutes) {
-        List<MeetingDto> response = meetingService.addMeeting(date, meetingInMinutes).stream()
-            .map(meetingMapper::mapToMeetingDto).toList();
-        return ResponseEntity.ok(response);
-    }
+  @GetMapping("/meetings/duration")
+  public ResponseEntity<List<MeetingDto>> getAvailableMeetingsByDuration(
+      @RequestParam("date") LocalDate date, @RequestParam("duration") Long meetingInMinutes) {
+    List<MeetingDto> response =
+        meetingService.addMeeting(date, meetingInMinutes).stream()
+            .map(meetingMapper::mapToMeetingDto)
+            .toList();
+    return ResponseEntity.ok(response);
+  }
 
-    @PostMapping("/meetings")
-    public ResponseEntity<MeetingDto> addMeeting(@RequestBody MeetingDto meetingDto) {
-        Either<Meeting, Errors> response = meetingService.addMeeting(meetingMapper.mapToMeeting(meetingDto));
-        if (response.hasErrors()) {
-            throw new BadRequestException(response.getAllErrors().toString());
-        }
-        return ResponseEntity.ok(meetingMapper.mapToMeetingDto(response.getLeft()));
+  @PostMapping("/meetings")
+  public ResponseEntity<MeetingDto> addMeeting(@RequestBody MeetingDto meetingDto) {
+    Either<Meeting, Errors> response =
+        meetingService.addMeeting(meetingMapper.mapToMeeting(meetingDto));
+    if (response.hasErrors()) {
+      throw new BadRequestException(response.getAllErrors().toString());
     }
+    return ResponseEntity.ok(meetingMapper.mapToMeetingDto(response.getLeft()));
+  }
 }

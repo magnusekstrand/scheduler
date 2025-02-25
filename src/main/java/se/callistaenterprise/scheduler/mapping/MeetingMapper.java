@@ -8,7 +8,7 @@ import se.callistaenterprise.scheduler.entity.Meeting;
 @Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
 public interface MeetingMapper {
 
-    MeetingDto mapToMeetingDto(Meeting meeting);
+  MeetingDto mapToMeetingDto(Meeting meeting);
 
-    Meeting mapToMeeting(MeetingDto meetingDto);
+  Meeting mapToMeeting(MeetingDto meetingDto);
 }

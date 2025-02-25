@@ -14,23 +14,13 @@
   <packaging>war</packaging>
   <name>scheduler</name>
   <description>Simple meeting scheduler</description>
-  <url/>
-  <licenses>
-    <license/>
-  </licenses>
-  <developers>
-    <developer/>
-  </developers>
-  <scm>
-    <connection/>
-    <developerConnection/>
-    <tag/>
-    <url/>
-  </scm>
+  <url>https://github.com/magnusekstrand/scheduler</url>
+
   <properties>
     <java.version>21</java.version>
     <mapstruct.version>1.6.3</mapstruct.version>
     <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
+    <spotless-maven-plugin.version>2.43.0</spotless-maven-plugin.version>
   </properties>
 
   <dependencyManagement>
@@ -96,6 +86,24 @@
 
   <build>
     <plugins>
+      <plugin>
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
+        <version>${spotless-maven-plugin.version}</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>apply</goal>
+            </goals>
+            <phase>verify</phase>
+          </execution>
+        </executions>
+        <configuration>
+          <java>
+            <googleJavaFormat/>
+          </java>
+        </configuration>
+      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
