@@ -2,7 +2,7 @@
 
 ## Business logic
 
-* You can only schedule a meeting between "working hours", ["09:00-17:00"]
+* You can only schedule a meeting between "working hours", ["08:00-17:00"]
 * At upstart, add some meetings, ["12:00-12:15", "09:15-10:45", 15:00-15:30]
 * You can schedule a meeting over lunch
 * A meeting must be 15 minutes or longer
