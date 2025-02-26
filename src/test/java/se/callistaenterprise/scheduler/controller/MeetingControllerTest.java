@@ -160,4 +160,56 @@ class MeetingControllerTest {
         .perform(get("/api/scheduler/meetings").contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isOk());
   }
+
+  @Test
+  void getAvailableMeetingsByDuration_shouldReturnAvailableSlots_whenDurationsAreAvailable()
+      throws Exception {
+    MeetingDto availableSlot1 =
+        new MeetingDto(null, null, LocalDate.now(), LocalTime.of(9, 0), LocalTime.of(9, 45));
+    MeetingDto availableSlot2 =
+        new MeetingDto(null, null, LocalDate.now(), LocalTime.of(15, 45), LocalTime.of(16, 30));
+
+    when(meetingService.addMeeting(LocalDate.now(), 45L))
+        .thenReturn(
+            List.of(
+                Meeting.builder().start(LocalTime.of(9, 0)).end(LocalTime.of(9, 45)).build(),
+                Meeting.builder().start(LocalTime.of(15, 45)).end(LocalTime.of(16, 30)).build()));
+    when(meetingMapper.mapToMeetingDto(any(Meeting.class)))
+        .thenReturn(availableSlot1)
+        .thenReturn(availableSlot2);
+
+    mockMvc
+        .perform(
+            get("/api/scheduler/meetings/find")
+                .param("date", LocalDate.now().toString())
+                .param("duration", "45")
+                .contentType(MediaType.APPLICATION_JSON))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  void getAvailableMeetingsByDuration_shouldReturnEmptyList_whenNoSlotsAreAvailable()
+      throws Exception {
+    when(meetingService.addMeeting(LocalDate.now(), 45L)).thenReturn(List.of());
+
+    mockMvc
+        .perform(
+            get("/api/scheduler/meetings/find")
+                .param("date", LocalDate.now().toString())
+                .param("duration", "45")
+                .contentType(MediaType.APPLICATION_JSON))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  void getAvailableMeetingsByDuration_shouldReturnBadRequest_whenInvalidParametersAreProvided()
+      throws Exception {
+    mockMvc
+        .perform(
+            get("/api/scheduler/meetings/find")
+                .param("date", "")
+                .param("duration", "-10")
+                .contentType(MediaType.APPLICATION_JSON))
+        .andExpect(status().isBadRequest());
+  }
 }

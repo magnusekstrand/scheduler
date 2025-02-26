@@ -47,11 +47,11 @@ public class MeetingController {
     return ResponseEntity.ok(meetingMapper.mapToMeetingDto(response.getLeft()));
   }
 
-  @GetMapping("/meetings/duration")
+  @GetMapping("/meetings/find")
   public ResponseEntity<List<MeetingDto>> getAvailableMeetingsByDuration(
-      @RequestParam("date") LocalDate date, @RequestParam("duration") Long meetingInMinutes) {
+      @RequestParam LocalDate date, @RequestParam(name = "duration") Long meetingTimeInMinutes) {
     List<MeetingDto> response =
-        meetingService.addMeeting(date, meetingInMinutes).stream()
+        meetingService.addMeeting(date, meetingTimeInMinutes).stream()
             .map(meetingMapper::mapToMeetingDto)
             .toList();
     return ResponseEntity.ok(response);

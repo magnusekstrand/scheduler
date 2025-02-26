@@ -56,6 +56,6 @@ curl -s -X GET http://localhost:8080/api/scheduler/meetings | jq .
 
 curl -s -X GET http://localhost:8080/api/scheduler/meetings/1 | jq .
 
-### Get available meeting slots by specifying the meeting date and duration in minutes
+### Get available meeting slots by specifying a meeting date and the meeting duration in minutes
 
-curl -s -X GET http://localhost:8080/api/scheduler/meetings/2025-02-18/45 | jq .
+curl -s -F date=2025-02-18 -F duration=45 -X GET http://localhost:8080/api/scheduler/meetings/find | jq .
