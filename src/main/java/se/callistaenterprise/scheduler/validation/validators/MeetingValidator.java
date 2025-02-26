@@ -1,19 +1,23 @@
 package se.callistaenterprise.scheduler.validation.validators;
 
-import static se.callistaenterprise.scheduler.service.MeetingService.WORKING_HOURS_END;
-import static se.callistaenterprise.scheduler.service.MeetingService.WORKING_HOURS_START;
 import static se.callistaenterprise.scheduler.validation.SchedulerErrors.ErrorCode.FIELD_INVALID;
 import static se.callistaenterprise.scheduler.validation.SchedulerErrors.ErrorCode.FIELD_REQUIRED;
 
 import java.time.Duration;
-import java.time.LocalTime;
 import org.springframework.validation.Errors;
 import org.springframework.validation.ValidationUtils;
 import org.springframework.validation.Validator;
+import se.callistaenterprise.scheduler.config.WorkingHours;
 import se.callistaenterprise.scheduler.entity.Meeting;
 import se.callistaenterprise.scheduler.validation.SchedulerErrors;
 
 public class MeetingValidator implements Validator {
+
+  private final WorkingHours workingHours;
+
+  public MeetingValidator(WorkingHours workingHours) {
+    this.workingHours = workingHours;
+  }
 
   @Override
   public boolean supports(Class<?> cls) {
@@ -52,15 +56,15 @@ public class MeetingValidator implements Validator {
     }
 
     // Check meeting is within working hours
-    if (meeting.getStart().isBefore(LocalTime.parse(WORKING_HOURS_START))) {
+    if (meeting.getStart().isBefore(workingHours.getStart())) {
       errors.rejectValue(
           "start",
           FIELD_INVALID.name(),
-          "Meeting start time cannot be before " + WORKING_HOURS_START);
+          "Meeting start time cannot be before " + workingHours.getStart());
     }
-    if (meeting.getEnd().isAfter(LocalTime.parse(WORKING_HOURS_END))) {
+    if (meeting.getEnd().isAfter(workingHours.getEnd())) {
       errors.rejectValue(
-          "end", FIELD_INVALID.name(), "Meeting end time cannot be after " + WORKING_HOURS_END);
+          "end", FIELD_INVALID.name(), "Meeting end time cannot be after " + workingHours.getEnd());
     }
   }
 

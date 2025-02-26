@@ -1,8 +1,6 @@
 package se.callistaenterprise.scheduler.validation.validators;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static se.callistaenterprise.scheduler.service.MeetingService.WORKING_HOURS_END;
-import static se.callistaenterprise.scheduler.service.MeetingService.WORKING_HOURS_START;
 import static se.callistaenterprise.scheduler.validation.SchedulerErrors.ErrorCode.FIELD_INVALID;
 import static se.callistaenterprise.scheduler.validation.SchedulerErrors.ErrorCode.FIELD_REQUIRED;
 
@@ -15,12 +13,14 @@ import org.junit.jupiter.api.Test;
 import org.springframework.validation.Errors;
 import org.springframework.validation.FieldError;
 import org.springframework.validation.SimpleErrors;
+import se.callistaenterprise.scheduler.config.WorkingHours;
 import se.callistaenterprise.scheduler.entity.Meeting;
 import se.callistaenterprise.scheduler.validation.SchedulerErrors;
 
 class MeetingValidatorTest {
 
-  MeetingValidator validator = new MeetingValidator();
+  WorkingHours workingHours = new WorkingHours("09:00", "17:00");
+  MeetingValidator validator = new MeetingValidator(workingHours);
   Errors errors;
 
   @Test
@@ -145,7 +145,7 @@ class MeetingValidatorTest {
     validator.validate(meeting, errors);
 
     verifyErrors(
-        "start", FIELD_INVALID, "Meeting start time cannot be before " + WORKING_HOURS_START);
+        "start", FIELD_INVALID, "Meeting start time cannot be before " + workingHours.getStart());
   }
 
   @Test
@@ -161,7 +161,7 @@ class MeetingValidatorTest {
     errors = new SimpleErrors(meeting);
     validator.validate(meeting, errors);
 
-    verifyErrors("end", FIELD_INVALID, "Meeting end time cannot be after " + WORKING_HOURS_END);
+    verifyErrors("end", FIELD_INVALID, "Meeting end time cannot be after " + workingHours.getEnd());
   }
 
   private void verifyErrors(String field, SchedulerErrors.ErrorCode errorCode, String message) {

@@ -2,7 +2,7 @@ package se.callistaenterprise.scheduler.validation;
 
 import org.springframework.validation.Errors;
 
-public class Validator {
+public final class Validator {
 
   public static <V> Errors validate(V target, org.springframework.validation.Validator validator) {
     if (validator == null) {

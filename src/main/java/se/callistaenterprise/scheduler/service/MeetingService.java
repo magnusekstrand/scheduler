@@ -11,9 +11,14 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.Errors;
+import se.callistaenterprise.scheduler.config.WorkingHours;
 import se.callistaenterprise.scheduler.datasource.MeetingStorage;
 import se.callistaenterprise.scheduler.entity.Meeting;
 import se.callistaenterprise.scheduler.model.Either;
@@ -24,13 +29,18 @@ import se.callistaenterprise.scheduler.validation.validators.MeetingValidator;
 @Service
 public class MeetingService {
 
-  public static final String WORKING_HOURS_START = "09:00";
-  public static final String WORKING_HOURS_END = "17:00";
-
   public static final Comparator<Meeting> dateComparator =
       (o1, o2) -> o1.getDate().compareTo(o2.getDate());
   public static final Comparator<Meeting> timeComparator =
       (o1, o2) -> o1.getStart().compareTo(o2.getStart());
+
+  private static final long BOUNDARY_TIME_BUFFER = 15L; // Minutes
+
+  private final WorkingHours workingHours;
+
+  public MeetingService(WorkingHours workingHours) {
+    this.workingHours = workingHours;
+  }
 
   public List<Meeting> getMeetings() {
     return MeetingStorage.findAll().stream()
@@ -59,7 +69,7 @@ public class MeetingService {
   }
 
   public Either<Meeting, Errors> addMeeting(Meeting meeting) {
-    Errors errors = validate(meeting, new MeetingValidator());
+    Errors errors = validate(meeting, new MeetingValidator(workingHours));
     if (errors.hasErrors()) {
       return right(errors);
     }
@@ -73,56 +83,39 @@ public class MeetingService {
   }
 
   public List<Meeting> addMeeting(LocalDate date, Long meetingTimeInMinutes) {
-    List<Meeting> existingMeetings =
-        MeetingStorage.findAll().stream()
-            .filter(item -> item.getDate().equals(date))
-            .sorted(timeComparator)
-            .toList();
+    LocalTime startOfDay = workingHours.getStart();
+    LocalTime endOfDay = workingHours.getEnd();
 
-    LocalTime startOfDay = LocalTime.parse(WORKING_HOURS_START);
-    LocalTime endOfDay = LocalTime.parse(WORKING_HOURS_END);
+    List<Meeting> boundaryList =
+        new ArrayList<>(
+            MeetingStorage.findAll().stream()
+                .filter(item -> item.getDate().equals(date))
+                .sorted(timeComparator)
+                .toList());
 
-    Meeting startBoundary =
-        Meeting.builder()
-            .title("startBoundary")
-            .date(date)
-            .start(startOfDay.minusMinutes(15L))
-            .end(startOfDay)
-            .build();
-    Meeting endBoundary =
-        Meeting.builder()
-            .title("endBoundary")
-            .date(date)
-            .start(endOfDay)
-            .end(endOfDay.plusMinutes(15L))
-            .build();
+    // Add boundaries to list
+    boundaryList.addFirst(
+        createBoundaryMeeting("startBoundary", date, startOfDay.minusMinutes(15L), startOfDay));
+    boundaryList.add(
+        createBoundaryMeeting("endBoundary", date, endOfDay, endOfDay.plusMinutes(15L)));
 
-    List<Meeting> boundaryList = new ArrayList<>();
-    boundaryList.addFirst(startBoundary);
-    boundaryList.addAll(existingMeetings);
-    boundaryList.addLast(endBoundary);
-
-    List<Meeting> availableSlots = new ArrayList<>();
-
-    int ctr = 0;
-    while (ctr < boundaryList.size() - 1) {
-      Meeting m1 = boundaryList.get(ctr);
-      Meeting m2 = boundaryList.get(ctr + 1);
-
-      long differenceBetweenMeetings = Duration.between(m1.getEnd(), m2.getStart()).toMinutes();
-      if (differenceBetweenMeetings > meetingTimeInMinutes) {
-        Meeting m = Meeting.builder().date(date).start(m1.getEnd()).end(m2.getStart()).build();
-        availableSlots.add(m);
-      }
-
-      ctr++;
-    }
-
-    return availableSlots;
+    return IntStream.range(0, boundaryList.size() - 1)
+        .mapToObj(
+            i -> {
+              Meeting m1 = boundaryList.get(i);
+              Meeting m2 = boundaryList.get(i + 1);
+              long differenceBetweenMeetings =
+                  Duration.between(m1.getEnd(), m2.getStart()).toMinutes();
+              return differenceBetweenMeetings > meetingTimeInMinutes
+                  ? Meeting.builder().date(date).start(m1.getEnd()).end(m2.getStart()).build()
+                  : null;
+            })
+        .filter(Objects::nonNull)
+        .toList();
   }
 
   private boolean isTimeAvailable(Meeting meeting) {
-    return !isTimeConflicting(meeting) && isMeetingTimeDurationWithinLimits(meeting);
+    return !isTimeConflicting(meeting) && isMeetingDurationValid(meeting);
   }
 
   private boolean isTimeConflicting(Meeting meeting) {
@@ -137,12 +130,11 @@ public class MeetingService {
     }
 
     return existingMeetings.stream()
-        .filter(item -> isBetween(meeting.getStart(), item.getStart(), item.getEnd()))
-        .anyMatch(item -> isBetween(meeting.getEnd(), item.getStart(), item.getEnd()));
+        .filter(item -> isTimeBetween(meeting.getStart(), item.getStart(), item.getEnd()))
+        .anyMatch(item -> isTimeBetween(meeting.getEnd(), item.getStart(), item.getEnd()));
   }
 
-  private boolean isMeetingTimeDurationWithinLimits(Meeting meeting) {
-    // Narrow list to same day and sort meetings by start time
+  private boolean isMeetingDurationValid(Meeting meeting) {
     List<Meeting> existingMeetings =
         MeetingStorage.findAll().stream()
             .filter(item -> item.getDate().equals(meeting.getDate()))
@@ -153,50 +145,44 @@ public class MeetingService {
       return true;
     }
 
-    LocalTime startOfDay = LocalTime.parse(WORKING_HOURS_START);
-    LocalTime endOfDay = LocalTime.parse(WORKING_HOURS_END);
-    LocalTime startTime = meeting.getStart();
-    LocalTime endTime = meeting.getEnd();
+    LocalTime startOfDay = workingHours.getStart();
+    LocalTime endOfDay = workingHours.getEnd();
+    long meetingDuration = Duration.between(meeting.getStart(), meeting.getEnd()).toMinutes();
 
-    long meetingTimeInMinutes = Duration.between(startTime, endTime).toMinutes();
+    Meeting startBoundaryMeeting =
+        createBoundaryMeeting(
+            "startBoundary",
+            meeting.getDate(),
+            startOfDay.minusMinutes(BOUNDARY_TIME_BUFFER),
+            startOfDay);
+    Meeting endBoundaryMeeting =
+        createBoundaryMeeting(
+            "endBoundary", meeting.getDate(), endOfDay, endOfDay.plusMinutes(BOUNDARY_TIME_BUFFER));
 
-    Meeting startBoundary =
-        Meeting.builder()
-            .title("startBoundary")
-            .date(meeting.getDate())
-            .start(startOfDay.minusMinutes(15L))
-            .end(startOfDay)
-            .build();
-    Meeting endBoundary =
-        Meeting.builder()
-            .title("endBoundary")
-            .date(meeting.getDate())
-            .start(endOfDay)
-            .end(endOfDay.plusMinutes(15L))
-            .build();
+    List<Meeting> allMeetings =
+        Stream.concat(
+                Stream.concat(Stream.of(startBoundaryMeeting), existingMeetings.stream()),
+                Stream.of(endBoundaryMeeting))
+            .toList();
 
-    List<Meeting> boundaryList = new ArrayList<>();
-    boundaryList.addFirst(startBoundary);
-    boundaryList.addAll(existingMeetings);
-    boundaryList.addLast(endBoundary);
-
-    int ctr = 0;
-    while (ctr < boundaryList.size() - 1) {
-      Meeting m1 = boundaryList.get(ctr);
-      Meeting m2 = boundaryList.get(ctr + 1);
-
-      if (isBetween(startTime, m1.getEnd(), m2.getStart())) {
-        long diff = Duration.between(m1.getEnd(), m2.getStart()).toMinutes();
-        return diff > meetingTimeInMinutes;
-      }
-
-      ctr++;
-    }
-
-    return false;
+    return IntStream.range(0, allMeetings.size() - 1)
+        .mapToObj(index -> Map.entry(allMeetings.get(index), allMeetings.get(index + 1)))
+        .filter(
+            pair ->
+                isTimeBetween(
+                    meeting.getStart(), pair.getKey().getEnd(), pair.getValue().getStart()))
+        .map(
+            pair ->
+                Duration.between(pair.getKey().getEnd(), pair.getValue().getStart()).toMinutes())
+        .anyMatch(gapDuration -> gapDuration > meetingDuration);
   }
 
-  private boolean isBetween(LocalTime targetTime, LocalTime startTime, LocalTime endTime) {
-    return !targetTime.isBefore(startTime) && !targetTime.isAfter(endTime);
+  private Meeting createBoundaryMeeting(
+      String title, LocalDate date, LocalTime start, LocalTime end) {
+    return Meeting.builder().title(title).date(date).start(start).end(end).build();
+  }
+
+  private boolean isTimeBetween(LocalTime time, LocalTime start, LocalTime end) {
+    return !time.isBefore(start) && !time.isAfter(end);
   }
 }

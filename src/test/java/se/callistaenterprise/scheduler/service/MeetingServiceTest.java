@@ -15,13 +15,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 import org.springframework.validation.Errors;
+import se.callistaenterprise.scheduler.config.WorkingHours;
 import se.callistaenterprise.scheduler.datasource.MeetingStorage;
 import se.callistaenterprise.scheduler.entity.Meeting;
 import se.callistaenterprise.scheduler.model.Either;
 
 class MeetingServiceTest {
 
-  private final MeetingService meetingService = new MeetingService();
+  WorkingHours workingHours = new WorkingHours("09:00", "17:00");
+  MeetingService meetingService = new MeetingService(workingHours);
 
   @BeforeEach
   void beforeEach() {
