@@ -1,4 +1,4 @@
-# Simple scheduler
+# Simple scheduler built with Spring and Java
 
 ## Business logic
 
