@@ -8,7 +8,6 @@
 * A meeting must be 15 minutes or longer
 * Manage bad requests
 * Manage when there are no available meeting slots
-* You should be able to send a request
 * Submit meeting time in minutes and return all possible times
 * Nothing stops you to add a meeting i the past
 * Nothing stops you to schedule meetings on weekends and holidays
