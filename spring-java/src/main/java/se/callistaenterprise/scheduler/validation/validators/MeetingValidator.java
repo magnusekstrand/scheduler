@@ -7,16 +7,16 @@ import java.time.Duration;
 import org.springframework.validation.Errors;
 import org.springframework.validation.ValidationUtils;
 import org.springframework.validation.Validator;
-import se.callistaenterprise.scheduler.config.WorkingHours;
+import se.callistaenterprise.scheduler.config.SchedulerProperties;
 import se.callistaenterprise.scheduler.entity.Meeting;
 import se.callistaenterprise.scheduler.validation.SchedulerErrors;
 
 public class MeetingValidator implements Validator {
 
-  private final WorkingHours workingHours;
+  private final SchedulerProperties schedulerProperties;
 
-  public MeetingValidator(WorkingHours workingHours) {
-    this.workingHours = workingHours;
+  public MeetingValidator(SchedulerProperties schedulerProperties) {
+    this.schedulerProperties = schedulerProperties;
   }
 
   @Override
@@ -56,15 +56,18 @@ public class MeetingValidator implements Validator {
     }
 
     // Check meeting is within working hours
-    if (meeting.getStart().isBefore(workingHours.getStart())) {
+    if (meeting.getStart().isBefore(schedulerProperties.getWorkingHours().getStart())) {
       errors.rejectValue(
           "start",
           FIELD_INVALID.name(),
-          "Meeting start time cannot be before " + workingHours.getStart());
+          "Meeting start time cannot be before "
+              + schedulerProperties.getWorkingHours().getStart());
     }
-    if (meeting.getEnd().isAfter(workingHours.getEnd())) {
+    if (meeting.getEnd().isAfter(schedulerProperties.getWorkingHours().getEnd())) {
       errors.rejectValue(
-          "end", FIELD_INVALID.name(), "Meeting end time cannot be after " + workingHours.getEnd());
+          "end",
+          FIELD_INVALID.name(),
+          "Meeting end time cannot be after " + schedulerProperties.getWorkingHours().getEnd());
     }
   }
 

@@ -15,15 +15,19 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 import org.springframework.validation.Errors;
-import se.callistaenterprise.scheduler.config.WorkingHours;
+import se.callistaenterprise.scheduler.config.SchedulerProperties;
+import se.callistaenterprise.scheduler.config.SchedulerProperties.WorkingHours;
 import se.callistaenterprise.scheduler.datasource.MeetingStorage;
 import se.callistaenterprise.scheduler.entity.Meeting;
 import se.callistaenterprise.scheduler.model.Either;
 
 class MeetingServiceTest {
 
+  List<String> weekends = List.of("Saturday", "Sunday");
   WorkingHours workingHours = new WorkingHours("09:00", "17:00");
-  MeetingService meetingService = new MeetingService(workingHours);
+  SchedulerProperties schedulerProperties = new SchedulerProperties(weekends, workingHours);
+
+  MeetingService meetingService = new MeetingService(schedulerProperties);
 
   @BeforeEach
   void beforeEach() {
@@ -53,6 +57,24 @@ class MeetingServiceTest {
       assertEquals(end, addedMeeting.getEnd());
 
       mockedStatic.verify(() -> MeetingStorage.insert(any(Meeting.class)));
+    }
+  }
+
+  @Test
+  void testAddMeetingNotInsertedWhenDateIsWeekend() {
+    try (MockedStatic<MeetingStorage> mockedStatic = mockStatic(MeetingStorage.class)) {
+      String title = "Team Standup";
+      LocalDate date = LocalDate.of(2023, 10, 14);
+      LocalTime start = LocalTime.of(9, 0);
+      LocalTime end = LocalTime.of(9, 30);
+
+      Meeting meetingToAdd =
+          Meeting.builder().title(title).date(date).start(start).end(end).build();
+
+      Either<Meeting, Errors> response = meetingService.addMeeting(meetingToAdd);
+
+      assertThat(response.hasErrors()).isTrue();
+      mockedStatic.verify(() -> MeetingStorage.insert(any(Meeting.class)), never());
     }
   }
 

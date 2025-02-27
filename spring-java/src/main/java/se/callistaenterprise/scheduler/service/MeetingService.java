@@ -5,6 +5,7 @@ import static se.callistaenterprise.scheduler.model.Either.right;
 import static se.callistaenterprise.scheduler.validation.SchedulerErrors.ErrorCode.TIME_NOT_AVAILABLE;
 import static se.callistaenterprise.scheduler.validation.Validator.validate;
 
+import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -18,7 +19,7 @@ import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.Errors;
-import se.callistaenterprise.scheduler.config.WorkingHours;
+import se.callistaenterprise.scheduler.config.SchedulerProperties;
 import se.callistaenterprise.scheduler.datasource.MeetingStorage;
 import se.callistaenterprise.scheduler.entity.Meeting;
 import se.callistaenterprise.scheduler.model.Either;
@@ -36,10 +37,10 @@ public class MeetingService {
 
   private static final long BOUNDARY_TIME_BUFFER = 15L; // Minutes
 
-  private final WorkingHours workingHours;
+  private final SchedulerProperties schedulerProperties;
 
-  public MeetingService(WorkingHours workingHours) {
-    this.workingHours = workingHours;
+  public MeetingService(SchedulerProperties schedulerProperties) {
+    this.schedulerProperties = schedulerProperties;
   }
 
   public List<Meeting> getMeetings() {
@@ -69,7 +70,7 @@ public class MeetingService {
   }
 
   public Either<Meeting, Errors> addMeeting(Meeting meeting) {
-    Errors errors = validate(meeting, new MeetingValidator(workingHours));
+    Errors errors = validate(meeting, new MeetingValidator(schedulerProperties));
     if (errors.hasErrors()) {
       return right(errors);
     }
@@ -83,8 +84,8 @@ public class MeetingService {
   }
 
   public List<Meeting> addMeeting(LocalDate date, Long meetingTimeInMinutes) {
-    LocalTime startOfDay = workingHours.getStart();
-    LocalTime endOfDay = workingHours.getEnd();
+    LocalTime startOfDay = getStartOfDay();
+    LocalTime endOfDay = getEndOfDay();
 
     List<Meeting> boundaryList =
         new ArrayList<>(
@@ -114,8 +115,23 @@ public class MeetingService {
         .toList();
   }
 
+  private Meeting createBoundaryMeeting(
+      String title, LocalDate date, LocalTime start, LocalTime end) {
+    return Meeting.builder().title(title).date(date).start(start).end(end).build();
+  }
+
+  private LocalTime getStartOfDay() {
+    return schedulerProperties.getWorkingHours().getStart();
+  }
+
+  private LocalTime getEndOfDay() {
+    return schedulerProperties.getWorkingHours().getEnd();
+  }
+
   private boolean isTimeAvailable(Meeting meeting) {
-    return !isTimeConflicting(meeting) && isMeetingDurationValid(meeting);
+    return isWorkingDay(meeting.getDate())
+        && !isTimeConflicting(meeting)
+        && isMeetingDurationValid(meeting);
   }
 
   private boolean isTimeConflicting(Meeting meeting) {
@@ -145,8 +161,8 @@ public class MeetingService {
       return true;
     }
 
-    LocalTime startOfDay = workingHours.getStart();
-    LocalTime endOfDay = workingHours.getEnd();
+    LocalTime startOfDay = getStartOfDay();
+    LocalTime endOfDay = getEndOfDay();
     long meetingDuration = Duration.between(meeting.getStart(), meeting.getEnd()).toMinutes();
 
     Meeting startBoundaryMeeting =
@@ -177,12 +193,12 @@ public class MeetingService {
         .anyMatch(gapDuration -> gapDuration > meetingDuration);
   }
 
-  private Meeting createBoundaryMeeting(
-      String title, LocalDate date, LocalTime start, LocalTime end) {
-    return Meeting.builder().title(title).date(date).start(start).end(end).build();
-  }
-
   private boolean isTimeBetween(LocalTime time, LocalTime start, LocalTime end) {
     return !time.isBefore(start) && !time.isAfter(end);
+  }
+
+  private boolean isWorkingDay(LocalDate date) {
+    DayOfWeek dayOfWeek = date.getDayOfWeek();
+    return !schedulerProperties.getWeekends().contains(dayOfWeek.name());
   }
 }

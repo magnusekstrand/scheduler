@@ -13,15 +13,20 @@ import org.junit.jupiter.api.Test;
 import org.springframework.validation.Errors;
 import org.springframework.validation.FieldError;
 import org.springframework.validation.SimpleErrors;
-import se.callistaenterprise.scheduler.config.WorkingHours;
+import se.callistaenterprise.scheduler.config.SchedulerProperties;
+import se.callistaenterprise.scheduler.config.SchedulerProperties.WorkingHours;
 import se.callistaenterprise.scheduler.entity.Meeting;
 import se.callistaenterprise.scheduler.validation.SchedulerErrors;
 
 class MeetingValidatorTest {
 
-  WorkingHours workingHours = new WorkingHours("09:00", "17:00");
-  MeetingValidator validator = new MeetingValidator(workingHours);
   Errors errors;
+
+  List<String> weekends = List.of("Saturday", "Sunday");
+  WorkingHours workingHours = new WorkingHours("09:00", "17:00");
+  SchedulerProperties schedulerProperties = new SchedulerProperties(weekends, workingHours);
+
+  MeetingValidator validator = new MeetingValidator(schedulerProperties);
 
   @Test
   void validate_TitleIsEmpty_ShouldRejectTitle() {
