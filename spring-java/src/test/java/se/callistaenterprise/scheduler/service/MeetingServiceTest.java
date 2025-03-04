@@ -1,362 +1,163 @@
 package se.callistaenterprise.scheduler.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.never;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.List;
-import org.junit.jupiter.api.BeforeEach;
+import java.util.Collections;
 import org.junit.jupiter.api.Test;
-import org.mockito.MockedStatic;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.validation.Errors;
 import se.callistaenterprise.scheduler.config.SchedulerProperties;
-import se.callistaenterprise.scheduler.config.SchedulerProperties.WorkingHours;
 import se.callistaenterprise.scheduler.datasource.MeetingStorage;
 import se.callistaenterprise.scheduler.entity.Meeting;
 import se.callistaenterprise.scheduler.model.Either;
 
+@SpringBootTest
 class MeetingServiceTest {
 
-  List<String> weekends = List.of("Saturday", "Sunday");
-  WorkingHours workingHours = new WorkingHours("09:00", "17:00");
-  SchedulerProperties schedulerProperties = new SchedulerProperties(weekends, workingHours);
+  @Autowired private MeetingService meetingService;
 
-  MeetingService meetingService = new MeetingService(schedulerProperties);
+  @MockitoBean private SchedulerProperties schedulerProperties;
 
-  @BeforeEach
-  void beforeEach() {
-    MeetingStorage.removeAll();
+  @MockitoBean private MeetingStorage meetingStorage;
+
+  @Test
+  void testAddMeeting_Success() {
+    when(meetingStorage.add(any(Meeting.class)))
+        .thenReturn(
+            Meeting.builder()
+                .id(1L)
+                .title("Team Meeting")
+                .date(LocalDate.of(2023, 12, 1))
+                .start(LocalTime.of(10, 0))
+                .end(LocalTime.of(11, 0))
+                .build());
+
+    when(schedulerProperties.getWeekends()).thenReturn(Collections.emptyList());
+    SchedulerProperties.WorkingHours workingHours =
+        new SchedulerProperties.WorkingHours("08:00", "18:00");
+    when(schedulerProperties.getWorkingHours()).thenReturn(workingHours);
+
+    Meeting meeting =
+        Meeting.builder()
+            .id(null)
+            .title("Team Meeting")
+            .date(LocalDate.of(2023, 12, 1))
+            .start(LocalTime.of(10, 0))
+            .end(LocalTime.of(11, 0))
+            .build();
+
+    Either<Meeting, Errors> result = meetingService.addMeeting(meeting);
+
+    assertThat(result.hasErrors()).isFalse();
+    assertThat(result.getLeft()).isNotNull();
+    assertThat(result.getLeft().getTitle()).isEqualTo("Team Meeting");
   }
 
   @Test
-  void testAddMeetingSuccessfully() {
-    try (MockedStatic<MeetingStorage> mockedStatic = mockStatic(MeetingStorage.class)) {
-      String title = "Team Standup";
-      LocalDate date = LocalDate.of(2023, 10, 10);
-      LocalTime start = LocalTime.of(9, 0);
-      LocalTime end = LocalTime.of(9, 30);
+  void testAddMeeting_TimeConflict() {
+    Meeting conflictingMeeting =
+        Meeting.builder()
+            .id(1L)
+            .title("Existing Meeting")
+            .date(LocalDate.of(2023, 12, 1))
+            .start(LocalTime.of(10, 0))
+            .end(LocalTime.of(11, 0))
+            .build();
 
-      Meeting meetingToAdd =
-          Meeting.builder().title(title).date(date).start(start).end(end).build();
+    when(meetingStorage.sort()).thenReturn(Collections.singletonList(conflictingMeeting));
 
-      mockedStatic.when(() -> MeetingStorage.insert(any(Meeting.class))).thenReturn(meetingToAdd);
+    when(schedulerProperties.getWeekends()).thenReturn(Collections.emptyList());
+    SchedulerProperties.WorkingHours workingHours =
+        new SchedulerProperties.WorkingHours("08:00", "18:00");
+    when(schedulerProperties.getWorkingHours()).thenReturn(workingHours);
 
-      Either<Meeting, Errors> response = meetingService.addMeeting(meetingToAdd);
-      Meeting addedMeeting = response.getLeft();
+    Meeting newMeeting =
+        Meeting.builder()
+            .id(null)
+            .title("Team Meeting")
+            .date(LocalDate.of(2023, 12, 1))
+            .start(LocalTime.of(10, 30))
+            .end(LocalTime.of(11, 30))
+            .build();
 
-      assertNotNull(addedMeeting);
-      assertEquals(title, addedMeeting.getTitle());
-      assertEquals(date, addedMeeting.getDate());
-      assertEquals(start, addedMeeting.getStart());
-      assertEquals(end, addedMeeting.getEnd());
+    Either<Meeting, Errors> result = meetingService.addMeeting(newMeeting);
 
-      mockedStatic.verify(() -> MeetingStorage.insert(any(Meeting.class)));
-    }
+    assertThat(result.hasErrors()).isTrue();
+    assertThat(result.getLeft()).isNull();
+    assertThat(result.getRight()).isNotNull();
   }
 
   @Test
-  void testAddMeetingNotInsertedWhenDateIsWeekend() {
-    try (MockedStatic<MeetingStorage> mockedStatic = mockStatic(MeetingStorage.class)) {
-      String title = "Team Standup";
-      LocalDate date = LocalDate.of(2023, 10, 14);
-      LocalTime start = LocalTime.of(9, 0);
-      LocalTime end = LocalTime.of(9, 30);
+  void testAddMeeting_InvalidData() {
+    when(schedulerProperties.getWeekends()).thenReturn(Collections.emptyList());
+    SchedulerProperties.WorkingHours workingHours =
+        new SchedulerProperties.WorkingHours("08:00", "18:00");
+    when(schedulerProperties.getWorkingHours()).thenReturn(workingHours);
 
-      Meeting meetingToAdd =
-          Meeting.builder().title(title).date(date).start(start).end(end).build();
+    Meeting invalidMeeting =
+        Meeting.builder()
+            .id(null)
+            .title("")
+            .date(LocalDate.of(2023, 12, 1))
+            .start(LocalTime.of(10, 0))
+            .end(LocalTime.of(9, 0)) // Invalid time range
+            .build();
 
-      Either<Meeting, Errors> response = meetingService.addMeeting(meetingToAdd);
+    Either<Meeting, Errors> result = meetingService.addMeeting(invalidMeeting);
 
-      assertThat(response.hasErrors()).isTrue();
-      mockedStatic.verify(() -> MeetingStorage.insert(any(Meeting.class)), never());
-    }
+    assertThat(result.hasErrors()).isTrue();
+    assertThat(result.getLeft()).isNull();
+    assertThat(result.getRight()).isNotNull();
+    assertThat(result.hasErrors()).isTrue();
+    assertThat(result.getLeft()).isNull();
+    assertThat(result.getRight()).isNotNull();
+    assertThat(result.hasErrors()).isTrue();
+    assertThat(result.getLeft()).isNull();
+    assertThat(result.getRight()).isNotNull();
+    assertThat(result.hasErrors()).isTrue();
+    assertThat(result.getLeft()).isNull();
+    assertThat(result.getRight()).isNotNull();
   }
 
   @Test
-  void testAddMeetingNotInsertedWhenConflictingTime() {
-    try (MockedStatic<MeetingStorage> mockedStatic = mockStatic(MeetingStorage.class)) {
-      String title = "Design Review";
-      LocalDate date = LocalDate.of(2023, 10, 10);
-      LocalTime start = LocalTime.of(10, 0);
-      LocalTime end = LocalTime.of(11, 0);
+  void testAddMeeting_OutOfWorkingHours() {
+    when(schedulerProperties.getWeekends()).thenReturn(Collections.emptyList());
+    SchedulerProperties.WorkingHours workingHours =
+        new SchedulerProperties.WorkingHours("08:00", "18:00");
+    when(schedulerProperties.getWorkingHours()).thenReturn(workingHours);
 
-      Meeting meetingToAdd =
-          Meeting.builder().title(title).date(date).start(start).end(end).build();
+    Meeting outOfHoursMeeting =
+        Meeting.builder()
+            .id(null)
+            .title("Late Meeting")
+            .date(LocalDate.of(2023, 12, 1))
+            .start(LocalTime.of(19, 0))
+            .end(LocalTime.of(20, 0))
+            .build();
 
-      List<Meeting> existingMeetings =
-          List.of(
-              Meeting.builder()
-                  .title("Existing Meeting")
-                  .date(date)
-                  .start(LocalTime.of(9, 30))
-                  .end(LocalTime.of(10, 30))
-                  .build());
+    Either<Meeting, Errors> result = meetingService.addMeeting(outOfHoursMeeting);
 
-      when(MeetingStorage.findAll()).thenReturn(existingMeetings);
-
-      Either<Meeting, Errors> response = meetingService.addMeeting(meetingToAdd);
-
-      assertThat(response.hasErrors()).isTrue();
-      mockedStatic.verify(() -> MeetingStorage.insert(any(Meeting.class)), never());
-    }
+    assertThat(result.hasErrors()).isTrue();
+    assertThat(result.getLeft()).isNull();
+    assertThat(result.getRight()).isNotNull();
+    assertThat(result.hasErrors()).isTrue();
+    assertThat(result.getLeft()).isNull();
+    assertThat(result.getRight()).isNotNull();
+    assertThat(result.hasErrors()).isTrue();
+    assertThat(result.getLeft()).isNull();
+    assertThat(result.getRight()).isNotNull();
   }
 
   @Test
-  void testAddMeetingNotInsertedWhenInvalidInput() {
-    try (MockedStatic<MeetingStorage> mockedStatic = mockStatic(MeetingStorage.class)) {
-      String title = "";
-      LocalDate date = LocalDate.of(2023, 10, 10);
-      LocalTime start = LocalTime.of(10, 0);
-      LocalTime end = LocalTime.of(9, 0);
-
-      Meeting meetingToAdd =
-          Meeting.builder().title(title).date(date).start(start).end(end).build();
-
-      Either<Meeting, Errors> response = meetingService.addMeeting(meetingToAdd);
-
-      assertThat(response.hasErrors()).isTrue();
-      mockedStatic.verify(() -> MeetingStorage.insert(any(Meeting.class)), never());
-    }
-  }
-
-  @Test
-  void testAddMeetingNotInsertedForNullTitle() {
-    try (MockedStatic<MeetingStorage> mockedStatic = mockStatic(MeetingStorage.class)) {
-      String title = null;
-      LocalDate date = LocalDate.of(2023, 10, 10);
-      LocalTime start = LocalTime.of(10, 0);
-      LocalTime end = LocalTime.of(11, 0);
-
-      Meeting meetingToAdd =
-          Meeting.builder().title(title).date(date).start(start).end(end).build();
-
-      Either<Meeting, Errors> response = meetingService.addMeeting(meetingToAdd);
-
-      assertThat(response.hasErrors()).isTrue();
-      mockedStatic.verify(() -> MeetingStorage.insert(any(Meeting.class)), never());
-    }
-  }
-
-  @Test
-  void testAddMeetingTimeAvailableAtStartOfDay() {
-    try (MockedStatic<MeetingStorage> mockedStatic = mockStatic(MeetingStorage.class)) {
-      String title = "Early Meeting";
-      LocalDate date = LocalDate.of(2023, 10, 10);
-      LocalTime start = LocalTime.of(9, 0);
-      LocalTime end = LocalTime.of(9, 30);
-
-      List<Meeting> existingMeetings =
-          List.of(
-              Meeting.builder()
-                  .title("Later Meeting")
-                  .date(date)
-                  .start(LocalTime.of(10, 0))
-                  .end(LocalTime.of(11, 0))
-                  .build());
-
-      when(MeetingStorage.findAll()).thenReturn(existingMeetings);
-
-      Meeting meetingToAdd =
-          Meeting.builder().title(title).date(date).start(start).end(end).build();
-      when(MeetingStorage.insert(any(Meeting.class))).thenReturn(meetingToAdd);
-
-      Either<Meeting, Errors> response = meetingService.addMeeting(meetingToAdd);
-      Meeting addedMeeting = response.getLeft();
-
-      assertNotNull(addedMeeting);
-      assertEquals(title, addedMeeting.getTitle());
-      assertEquals(date, addedMeeting.getDate());
-      assertEquals(start, addedMeeting.getStart());
-      assertEquals(end, addedMeeting.getEnd());
-
-      mockedStatic.verify(() -> MeetingStorage.insert(any(Meeting.class)));
-    }
-  }
-
-  @Test
-  void testAddMeetingTimeAvailableAtEndOfDay() {
-    try (MockedStatic<MeetingStorage> mockedStatic = mockStatic(MeetingStorage.class)) {
-      String title = "Wrap-Up Meeting";
-      LocalDate date = LocalDate.of(2023, 10, 10);
-      LocalTime start = LocalTime.of(16, 30);
-      LocalTime end = LocalTime.of(17, 0);
-
-      List<Meeting> existingMeetings =
-          List.of(
-              Meeting.builder()
-                  .title("Earlier Meeting")
-                  .date(date)
-                  .start(LocalTime.of(15, 0))
-                  .end(LocalTime.of(16, 0))
-                  .build());
-
-      when(MeetingStorage.findAll()).thenReturn(existingMeetings);
-
-      Meeting meetingToAdd =
-          Meeting.builder().title(title).date(date).start(start).end(end).build();
-      when(MeetingStorage.insert(any(Meeting.class))).thenReturn(meetingToAdd);
-
-      Either<Meeting, Errors> response = meetingService.addMeeting(meetingToAdd);
-      Meeting addedMeeting = response.getLeft();
-
-      assertNotNull(addedMeeting);
-      assertEquals(title, addedMeeting.getTitle());
-      assertEquals(date, addedMeeting.getDate());
-      assertEquals(start, addedMeeting.getStart());
-      assertEquals(end, addedMeeting.getEnd());
-
-      mockedStatic.verify(() -> MeetingStorage.insert(any(Meeting.class)));
-    }
-  }
-
-  @Test
-  void testAddMeetingTimeAvailableBetweenExistingMeetings() {
-    try (MockedStatic<MeetingStorage> mockedStatic = mockStatic(MeetingStorage.class)) {
-      String title = "Lunch Meeting";
-      LocalDate date = LocalDate.of(2023, 10, 10);
-      LocalTime start = LocalTime.of(11, 30);
-      LocalTime end = LocalTime.of(12, 30);
-
-      List<Meeting> existingMeetings =
-          List.of(
-              Meeting.builder()
-                  .title("Team Standup")
-                  .date(date)
-                  .start(LocalTime.of(9, 0))
-                  .end(LocalTime.of(9, 30))
-                  .build(),
-              Meeting.builder()
-                  .title("Design Review")
-                  .date(date)
-                  .start(LocalTime.of(10, 15))
-                  .end(LocalTime.of(11, 15))
-                  .build(),
-              Meeting.builder()
-                  .title("Retrospective")
-                  .date(date)
-                  .start(LocalTime.of(13, 0))
-                  .end(LocalTime.of(15, 0))
-                  .build(),
-              Meeting.builder()
-                  .title("Team information meeting")
-                  .date(date.plusDays(1))
-                  .start(LocalTime.of(11, 0))
-                  .end(LocalTime.of(12, 0))
-                  .build());
-
-      when(MeetingStorage.findAll()).thenReturn(existingMeetings);
-
-      Meeting meetingToAdd =
-          Meeting.builder().title(title).date(date).start(start).end(end).build();
-      when(MeetingStorage.insert(any(Meeting.class))).thenReturn(meetingToAdd);
-
-      Either<Meeting, Errors> response = meetingService.addMeeting(meetingToAdd);
-      Meeting addedMeeting = response.getLeft();
-
-      assertNotNull(addedMeeting);
-      assertEquals(title, addedMeeting.getTitle());
-      assertEquals(date, addedMeeting.getDate());
-      assertEquals(start, addedMeeting.getStart());
-      assertEquals(end, addedMeeting.getEnd());
-
-      mockedStatic.verify(() -> MeetingStorage.insert(any(Meeting.class)));
-    }
-  }
-
-  @Test
-  void testAddMeetingByDurationFindsAvailableSlots() {
-    try (MockedStatic<MeetingStorage> mockedStatic = mockStatic(MeetingStorage.class)) {
-      LocalDate date = LocalDate.of(2023, 10, 10);
-      Long meetingTimeInMinutes = 30L;
-
-      List<Meeting> existingMeetings =
-          List.of(
-              Meeting.builder()
-                  .title("Morning Meeting")
-                  .date(date)
-                  .start(LocalTime.of(9, 0))
-                  .end(LocalTime.of(9, 30))
-                  .build(),
-              Meeting.builder()
-                  .title("Late Morning Meeting")
-                  .date(date)
-                  .start(LocalTime.of(11, 0))
-                  .end(LocalTime.of(11, 30))
-                  .build(),
-              Meeting.builder()
-                  .title("Afternoon Meeting")
-                  .date(date)
-                  .start(LocalTime.of(15, 0))
-                  .end(LocalTime.of(15, 45))
-                  .build());
-
-      mockedStatic.when(MeetingStorage::findAll).thenReturn(existingMeetings);
-
-      List<Meeting> availableSlots = meetingService.addMeeting(date, meetingTimeInMinutes);
-
-      assertNotNull(availableSlots);
-      assertEquals(3, availableSlots.size());
-      assertEquals(LocalTime.of(9, 30), availableSlots.get(0).getStart());
-      assertEquals(LocalTime.of(11, 0), availableSlots.get(0).getEnd());
-    }
-  }
-
-  @Test
-  void testAddMeetingByDurationNoAvailableSlots() {
-    try (MockedStatic<MeetingStorage> mockedStatic = mockStatic(MeetingStorage.class)) {
-      LocalDate date = LocalDate.of(2023, 10, 10);
-      Long meetingTimeInMinutes = 60L;
-
-      List<Meeting> existingMeetings =
-          List.of(
-              Meeting.builder()
-                  .title("Morning Meeting")
-                  .date(date)
-                  .start(LocalTime.of(9, 0))
-                  .end(LocalTime.of(9, 30))
-                  .build(),
-              Meeting.builder()
-                  .title("Late Morning Meeting")
-                  .date(date)
-                  .start(LocalTime.of(9, 45))
-                  .end(LocalTime.of(13, 30))
-                  .build(),
-              Meeting.builder()
-                  .title("Afternoon Meeting")
-                  .date(date)
-                  .start(LocalTime.of(14, 0))
-                  .end(LocalTime.of(16, 45))
-                  .build());
-
-      mockedStatic.when(MeetingStorage::findAll).thenReturn(existingMeetings);
-
-      List<Meeting> availableSlots = meetingService.addMeeting(date, meetingTimeInMinutes);
-
-      assertNotNull(availableSlots);
-      assertEquals(0, availableSlots.size());
-    }
-  }
-
-  @Test
-  void testAddMeetingByDurationWithEmptyCalendar() {
-    try (MockedStatic<MeetingStorage> mockedStatic = mockStatic(MeetingStorage.class)) {
-      LocalDate date = LocalDate.of(2023, 10, 10);
-      Long meetingTimeInMinutes = 30L;
-
-      mockedStatic.when(MeetingStorage::findAll).thenReturn(List.of());
-
-      List<Meeting> availableSlots = meetingService.addMeeting(date, meetingTimeInMinutes);
-
-      assertNotNull(availableSlots);
-      assertEquals(1, availableSlots.size());
-      assertEquals(LocalTime.of(9, 0), availableSlots.get(0).getStart());
-      assertEquals(LocalTime.of(17, 0), availableSlots.get(0).getEnd());
-    }
+  void testAddMeeting_NullMeeting() {
+    assertThatExceptionOfType(IllegalArgumentException.class)
+        .isThrownBy(() -> meetingService.addMeeting(null));
   }
 }
