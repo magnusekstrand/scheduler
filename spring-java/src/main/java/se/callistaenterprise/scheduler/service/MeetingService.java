@@ -2,6 +2,9 @@ package se.callistaenterprise.scheduler.service;
 
 import static se.callistaenterprise.scheduler.model.Either.left;
 import static se.callistaenterprise.scheduler.model.Either.right;
+import static se.callistaenterprise.scheduler.validation.SchedulerErrors.ErrorCode.FIELD_INVALID;
+import static se.callistaenterprise.scheduler.validation.SchedulerErrors.ErrorCode.INSERT_FAILED;
+import static se.callistaenterprise.scheduler.validation.SchedulerErrors.ErrorCode.RESOURCE_NOT_FOUND;
 import static se.callistaenterprise.scheduler.validation.SchedulerErrors.ErrorCode.TIME_NOT_AVAILABLE;
 import static se.callistaenterprise.scheduler.validation.Validator.validate;
 
@@ -10,10 +13,10 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
@@ -30,43 +33,36 @@ import se.callistaenterprise.scheduler.validation.validators.MeetingValidator;
 @Service
 public class MeetingService {
 
-  public static final Comparator<Meeting> dateComparator =
-      (o1, o2) -> o1.getDate().compareTo(o2.getDate());
-  public static final Comparator<Meeting> timeComparator =
-      (o1, o2) -> o1.getStart().compareTo(o2.getStart());
-
   private static final long BOUNDARY_TIME_BUFFER = 15L; // Minutes
 
   private final SchedulerProperties schedulerProperties;
+  private final MeetingStorage meetingStorage;
 
-  public MeetingService(SchedulerProperties schedulerProperties) {
+  public MeetingService(SchedulerProperties schedulerProperties, MeetingStorage meetingStorage) {
     this.schedulerProperties = schedulerProperties;
+    this.meetingStorage = meetingStorage;
   }
 
+  /*
+    Returns a list of all meetings sorted by date and start time
+   */
   public List<Meeting> getMeetings() {
-    return MeetingStorage.findAll().stream()
-        .sorted(dateComparator.thenComparing(timeComparator))
-        .toList();
+    return meetingStorage.sort().stream().toList();
   }
 
   public Either<Meeting, Errors> getMeeting(Long id) {
     if (id == null) {
-      return right(
-          SchedulerErrors.createErrors(
-              id, "id", SchedulerErrors.ErrorCode.FIELD_INVALID, "id cannot be null"));
+      return right(SchedulerErrors.createErrors(id, "id", FIELD_INVALID, "id cannot be null"));
     }
 
-    Meeting meeting = MeetingStorage.find(id);
-    if (meeting == null) {
-      return right(
-          SchedulerErrors.createErrors(
-              id,
-              "id",
-              SchedulerErrors.ErrorCode.RESOURCE_NOT_FOUND,
-              "Cannot find meeting with id = " + id));
-    }
-
-    return left(meeting);
+    Meeting meeting = meetingStorage.getById(id);
+    return Optional.ofNullable(meeting)
+        .map(Either::left)
+        .orElseGet(
+            () ->
+                right(
+                    SchedulerErrors.createErrors(
+                        id, "id", RESOURCE_NOT_FOUND, "Cannot find meeting with id = " + id)));
   }
 
   public Either<Meeting, Errors> addMeeting(Meeting meeting) {
@@ -76,7 +72,10 @@ public class MeetingService {
     }
 
     if (isTimeAvailable(meeting)) {
-      return left(MeetingStorage.insert(meeting));
+      Meeting savedMeeting = meetingStorage.add(meeting);
+      return savedMeeting != null
+          ? left(savedMeeting)
+          : right(SchedulerErrors.createErrors(meeting, null, INSERT_FAILED, "Cannot add meeting"));
     }
 
     errors.reject(TIME_NOT_AVAILABLE.name());
@@ -89,16 +88,13 @@ public class MeetingService {
 
     List<Meeting> boundaryList =
         new ArrayList<>(
-            MeetingStorage.findAll().stream()
-                .filter(item -> item.getDate().equals(date))
-                .sorted(timeComparator)
-                .toList());
+            meetingStorage.sort().stream().filter(item -> item.getDate().equals(date)).toList());
 
     // Add boundaries to list
     boundaryList.addFirst(
-        createBoundaryMeeting("startBoundary", date, startOfDay.minusMinutes(15L), startOfDay));
+        createBoundaryMeeting("startBoundary", date, startOfDay.minusMinutes(BOUNDARY_TIME_BUFFER), startOfDay));
     boundaryList.add(
-        createBoundaryMeeting("endBoundary", date, endOfDay, endOfDay.plusMinutes(15L)));
+        createBoundaryMeeting("endBoundary", date, endOfDay, endOfDay.plusMinutes(BOUNDARY_TIME_BUFFER)));
 
     return IntStream.range(0, boundaryList.size() - 1)
         .mapToObj(
@@ -129,35 +125,34 @@ public class MeetingService {
   }
 
   private boolean isTimeAvailable(Meeting meeting) {
-    return isWorkingDay(meeting.getDate())
-        && !isTimeConflicting(meeting)
-        && isMeetingDurationValid(meeting);
+      return isWorkingDay(meeting.getDate())
+          && !isTimeConflicting(meeting)
+          && isMeetingDurationValid(meeting);
   }
 
   private boolean isTimeConflicting(Meeting meeting) {
     // Narrow list to same day
     List<Meeting> existingMeetings =
-        MeetingStorage.findAll().stream()
+        meetingStorage.sort().stream()
             .filter(item -> item.getDate().equals(meeting.getDate()))
             .toList();
 
-    if (existingMeetings.isEmpty()) {
-      return false;
-    }
+      if (existingMeetings.isEmpty()) {
+          return false;
+      }
 
-    return existingMeetings.stream()
-        .filter(item -> isTimeBetween(meeting.getStart(), item.getStart(), item.getEnd()))
-        .anyMatch(item -> isTimeBetween(meeting.getEnd(), item.getStart(), item.getEnd()));
+      return existingMeetings.stream()
+          .anyMatch(item -> isTimeBetween(meeting.getStart(), item.getStart(), item.getEnd())
+              || isTimeBetween(meeting.getEnd(), item.getStart(), item.getEnd()));
   }
 
   private boolean isMeetingDurationValid(Meeting meeting) {
-    List<Meeting> existingMeetings =
-        MeetingStorage.findAll().stream()
-            .filter(item -> item.getDate().equals(meeting.getDate()))
-            .sorted(timeComparator)
-            .toList();
+      List<Meeting> existingMeetings =
+          meetingStorage.sort().stream()
+              .filter(item -> item.getDate().equals(meeting.getDate()))
+              .toList();
 
-    if (existingMeetings.isEmpty()) {
+      if (existingMeetings.isEmpty()) {
       return true;
     }
 
@@ -175,7 +170,7 @@ public class MeetingService {
         createBoundaryMeeting(
             "endBoundary", meeting.getDate(), endOfDay, endOfDay.plusMinutes(BOUNDARY_TIME_BUFFER));
 
-    List<Meeting> allMeetings =
+      List<Meeting> allMeetings =
         Stream.concat(
                 Stream.concat(Stream.of(startBoundaryMeeting), existingMeetings.stream()),
                 Stream.of(endBoundaryMeeting))
@@ -194,7 +189,7 @@ public class MeetingService {
   }
 
   private boolean isTimeBetween(LocalTime time, LocalTime start, LocalTime end) {
-    return !time.isBefore(start) && !time.isAfter(end);
+      return !time.isBefore(start) && !time.isAfter(end);
   }
 
   private boolean isWorkingDay(LocalDate date) {
