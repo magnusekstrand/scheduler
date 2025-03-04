@@ -10,7 +10,8 @@
 * Manage when there are no available meeting slots
 * Submit meeting time in minutes and return all possible times
 * Nothing stops you to add a meeting i the past
-* Nothing stops you to schedule meetings on weekends and holidays
+* You cannot add a meeting on a weekend
+* There is nothing stopping you to add a meeting on a holiday, f.e. eater, christmas
 
 ## Build application
 
