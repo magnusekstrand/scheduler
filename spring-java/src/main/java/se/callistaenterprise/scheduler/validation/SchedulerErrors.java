@@ -29,8 +29,10 @@ public class SchedulerErrors extends SimpleErrors {
   public enum ErrorCode {
     FIELD_REQUIRED("field.required"),
     FIELD_INVALID("field.invalid"),
+    TIME_NOT_AVAILABLE("time.not_available"),
     RESOURCE_NOT_FOUND("resource.not_found"),
-    TIME_NOT_AVAILABLE("time.not_available");
+    INSERT_FAILED("resource.insert_failed"),
+    ;
 
     private final String code;
 
