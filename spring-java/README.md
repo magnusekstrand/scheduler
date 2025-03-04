@@ -11,7 +11,7 @@
 * Submit meeting time in minutes and return all possible times
 * Nothing stops you to add a meeting i the past
 * You cannot add a meeting on a weekend
-* There is nothing stopping you to add a meeting on a holiday, f.e. eater, christmas
+* There is nothing stopping you to add a meeting on a holiday, f.e. easter, christmas
 
 ## Build application
 
