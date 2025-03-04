@@ -1,20 +1,23 @@
-package se.callistaenterprise.scheduler;
+package se.callistaenterprise.scheduler.config;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationListener;
-import org.springframework.context.event.ContextRefreshedEvent;
-import org.springframework.stereotype.Component;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import se.callistaenterprise.scheduler.datasource.MeetingStorage;
 import se.callistaenterprise.scheduler.entity.Meeting;
 
 @Slf4j
-@Component
-public class ApplicationInitializer implements ApplicationListener<ContextRefreshedEvent> {
+@Configuration
+public class StorageConfig {
 
-  @Override
-  public void onApplicationEvent(ContextRefreshedEvent event) {
+  @Bean
+  public MeetingStorage meetingStorage() {
+    return setupMeetingStorage(new MeetingStorage());
+  }
+
+  private MeetingStorage setupMeetingStorage(final MeetingStorage storage) {
     Meeting m1 =
         Meeting.builder()
             .title("Lunch phone call")
@@ -37,8 +40,10 @@ public class ApplicationInitializer implements ApplicationListener<ContextRefres
             .end(LocalTime.parse("15:30"))
             .build();
 
-    log.info("Insert meeting #1: {}", MeetingStorage.insert(m1));
-    log.info("Insert meeting #2: {}", MeetingStorage.insert(m2));
-    log.info("Insert meeting #3: {}", MeetingStorage.insert(m3));
+    log.info("Insert meeting #1: {}", storage.add(m1));
+    log.info("Insert meeting #2: {}", storage.add(m2));
+    log.info("Insert meeting #3: {}", storage.add(m3));
+
+    return storage;
   }
 }
