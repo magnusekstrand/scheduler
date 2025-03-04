@@ -1,21 +1,22 @@
 package se.callistaenterprise.scheduler.datasource;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-
-import java.time.LocalDate;
-import java.time.LocalTime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import se.callistaenterprise.scheduler.entity.Meeting;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatRuntimeException;
+
 class MeetingStorageTest {
+
+  MeetingStorage meetingStorage;
 
   @BeforeEach
   public void beforeEach() {
-    MeetingStorage.removeAll();
+    meetingStorage = new MeetingStorage();
   }
 
   @Test
@@ -30,16 +31,16 @@ class MeetingStorageTest {
             .build();
 
     // Act
-    Meeting insertedMeeting = MeetingStorage.insert(validMeeting);
+    Meeting insertedMeeting = meetingStorage.add(validMeeting);
+    assertThat(meetingStorage.size()).isEqualTo(1);
 
     // Assert
-    assertNotNull(insertedMeeting);
-    assertNotNull(insertedMeeting.getId());
-    assertEquals(1, MeetingStorage.size());
-    assertEquals(validMeeting.getTitle(), insertedMeeting.getTitle());
-    assertEquals(validMeeting.getDate(), insertedMeeting.getDate());
-    assertEquals(validMeeting.getStart(), insertedMeeting.getStart());
-    assertEquals(validMeeting.getEnd(), insertedMeeting.getEnd());
+    assertThat(insertedMeeting).isNotNull();
+    assertThat(insertedMeeting.getId()).isNotNull();
+    assertThat(validMeeting.getTitle()).isEqualTo(insertedMeeting.getTitle());
+    assertThat(validMeeting.getDate()).isEqualTo(insertedMeeting.getDate());
+    assertThat(validMeeting.getStart()).isEqualTo(insertedMeeting.getStart());
+    assertThat(validMeeting.getEnd()).isEqualTo(insertedMeeting.getEnd());
   }
 
   @Test
@@ -55,20 +56,18 @@ class MeetingStorageTest {
             .build();
 
     // Act & Assert
-    RuntimeException exception =
-        assertThrows(RuntimeException.class, () -> MeetingStorage.insert(meetingWithId));
-    assertEquals("Meeting.id must be null", exception.getMessage());
-    assertEquals(0, MeetingStorage.size());
+    assertThatRuntimeException().isThrownBy(() -> meetingStorage.add(meetingWithId)).withMessage("Meeting.id must be null");
+    assertThat(meetingStorage.size()).isEqualTo(0);
   }
 
   @Test
-  void testInsertNullMeetingReturnsNull() {
+  void testInsertNullMeetingIsUnsuccessfulAndNoMeetingsAreInserted() {
     // Act
-    Meeting result = MeetingStorage.insert(null);
+    Meeting result = meetingStorage.add(null);
 
     // Assert
-    assertNull(result);
-    assertEquals(0, MeetingStorage.size());
+    assertThat(result).isNull();
+    assertThat(meetingStorage.size()).isEqualTo(0);
   }
 
   @Test
@@ -82,7 +81,7 @@ class MeetingStorageTest {
             .end(LocalTime.of(9, 30))
             .build();
 
-    MeetingStorage.insert(initialMeeting);
+    assertThat(meetingStorage.add(initialMeeting)).isNotNull();
 
     // Act
     Meeting duplicateMeeting =
@@ -93,10 +92,37 @@ class MeetingStorageTest {
             .end(LocalTime.of(9, 30))
             .build(); // Duplicate content
 
-    Meeting result = MeetingStorage.insert(duplicateMeeting);
+    // Assert
+    assertThat(meetingStorage.add(duplicateMeeting)).isNotNull();
+    assertThat(meetingStorage.size()).isEqualTo(2);
+    assertThat(meetingStorage.getAll().getFirst().getId())
+        .isNotEqualTo(meetingStorage.getAll().getLast().getId());
+  }
+
+  @Test
+  void testInsertMeetingsWithDifferentDates() {
+    // Arrange
+    Meeting meeting1 =
+        Meeting.builder()
+            .title("Meeting 1")
+            .date(LocalDate.now())
+            .start(LocalTime.of(9, 0))
+            .end(LocalTime.of(10, 0))
+            .build();
+    Meeting meeting2 =
+        Meeting.builder()
+            .title("Meeting 2")
+            .date(LocalDate.now().plusDays(1))
+            .start(LocalTime.of(10, 0))
+            .end(LocalTime.of(11, 0))
+            .build();
+
+    // Act
+    meetingStorage.add(meeting1);
+    meetingStorage.add(meeting2);
 
     // Assert
-    assertNotNull(result);
-    assertEquals(2, MeetingStorage.size());
+    assertThat(meetingStorage.size()).isEqualTo(2);
+    assertThat(meetingStorage.getAll()).containsExactlyInAnyOrder(meeting1, meeting2);
   }
 }
