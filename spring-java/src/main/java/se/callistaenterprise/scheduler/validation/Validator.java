@@ -9,6 +9,12 @@ public final class Validator {
       throw new IllegalArgumentException(
           "The supplied [Validator] is " + "required and must not be null.");
     }
+
+    if (target == null) {
+      throw new IllegalArgumentException(
+          "The supplied target object is " + "required and must not be null.");
+    }
+
     if (!validator.supports(target.getClass())) {
       throw new IllegalArgumentException(
           "The supplied [Validator] must "
