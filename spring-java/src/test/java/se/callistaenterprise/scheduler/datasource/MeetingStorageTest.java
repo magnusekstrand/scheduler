@@ -1,14 +1,13 @@
 package se.callistaenterprise.scheduler.datasource;
 
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import se.callistaenterprise.scheduler.entity.Meeting;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatRuntimeException;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatRuntimeException;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import se.callistaenterprise.scheduler.entity.Meeting;
 
 class MeetingStorageTest {
 
@@ -56,7 +55,9 @@ class MeetingStorageTest {
             .build();
 
     // Act & Assert
-    assertThatRuntimeException().isThrownBy(() -> meetingStorage.add(meetingWithId)).withMessage("Meeting.id must be null");
+    assertThatRuntimeException()
+        .isThrownBy(() -> meetingStorage.add(meetingWithId))
+        .withMessage("Meeting.id must be null");
     assertThat(meetingStorage.size()).isEqualTo(0);
   }
 

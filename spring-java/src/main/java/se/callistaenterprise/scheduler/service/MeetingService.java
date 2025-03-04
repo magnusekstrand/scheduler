@@ -44,8 +44,8 @@ public class MeetingService {
   }
 
   /*
-    Returns a list of all meetings sorted by date and start time
-   */
+   Returns a list of all meetings sorted by date and start time
+  */
   public List<Meeting> getMeetings() {
     return meetingStorage.sort().stream().toList();
   }
@@ -92,9 +92,11 @@ public class MeetingService {
 
     // Add boundaries to list
     boundaryList.addFirst(
-        createBoundaryMeeting("startBoundary", date, startOfDay.minusMinutes(BOUNDARY_TIME_BUFFER), startOfDay));
+        createBoundaryMeeting(
+            "startBoundary", date, startOfDay.minusMinutes(BOUNDARY_TIME_BUFFER), startOfDay));
     boundaryList.add(
-        createBoundaryMeeting("endBoundary", date, endOfDay, endOfDay.plusMinutes(BOUNDARY_TIME_BUFFER)));
+        createBoundaryMeeting(
+            "endBoundary", date, endOfDay, endOfDay.plusMinutes(BOUNDARY_TIME_BUFFER)));
 
     return IntStream.range(0, boundaryList.size() - 1)
         .mapToObj(
@@ -125,9 +127,9 @@ public class MeetingService {
   }
 
   private boolean isTimeAvailable(Meeting meeting) {
-      return isWorkingDay(meeting.getDate())
-          && !isTimeConflicting(meeting)
-          && isMeetingDurationValid(meeting);
+    return isWorkingDay(meeting.getDate())
+        && !isTimeConflicting(meeting)
+        && isMeetingDurationValid(meeting);
   }
 
   private boolean isTimeConflicting(Meeting meeting) {
@@ -137,22 +139,24 @@ public class MeetingService {
             .filter(item -> item.getDate().equals(meeting.getDate()))
             .toList();
 
-      if (existingMeetings.isEmpty()) {
-          return false;
-      }
+    if (existingMeetings.isEmpty()) {
+      return false;
+    }
 
-      return existingMeetings.stream()
-          .anyMatch(item -> isTimeBetween(meeting.getStart(), item.getStart(), item.getEnd())
-              || isTimeBetween(meeting.getEnd(), item.getStart(), item.getEnd()));
+    return existingMeetings.stream()
+        .anyMatch(
+            item ->
+                isTimeBetween(meeting.getStart(), item.getStart(), item.getEnd())
+                    || isTimeBetween(meeting.getEnd(), item.getStart(), item.getEnd()));
   }
 
   private boolean isMeetingDurationValid(Meeting meeting) {
-      List<Meeting> existingMeetings =
-          meetingStorage.sort().stream()
-              .filter(item -> item.getDate().equals(meeting.getDate()))
-              .toList();
+    List<Meeting> existingMeetings =
+        meetingStorage.sort().stream()
+            .filter(item -> item.getDate().equals(meeting.getDate()))
+            .toList();
 
-      if (existingMeetings.isEmpty()) {
+    if (existingMeetings.isEmpty()) {
       return true;
     }
 
@@ -170,7 +174,7 @@ public class MeetingService {
         createBoundaryMeeting(
             "endBoundary", meeting.getDate(), endOfDay, endOfDay.plusMinutes(BOUNDARY_TIME_BUFFER));
 
-      List<Meeting> allMeetings =
+    List<Meeting> allMeetings =
         Stream.concat(
                 Stream.concat(Stream.of(startBoundaryMeeting), existingMeetings.stream()),
                 Stream.of(endBoundaryMeeting))
@@ -189,7 +193,7 @@ public class MeetingService {
   }
 
   private boolean isTimeBetween(LocalTime time, LocalTime start, LocalTime end) {
-      return !time.isBefore(start) && !time.isAfter(end);
+    return !time.isBefore(start) && !time.isAfter(end);
   }
 
   private boolean isWorkingDay(LocalDate date) {
