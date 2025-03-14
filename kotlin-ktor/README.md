@@ -22,17 +22,15 @@ Here's a list of features included in this project:
 
 ## Building & Running
 
-To build or run the project, use one of the following tasks:
+1. Execute gradle task `databaseInstance` and wait until Docker Compose builds image and starts container
 
-| Task                          | Description                                                          |
-| -------------------------------|---------------------------------------------------------------------- |
-| `./gradlew test`              | Run the tests                                                        |
-| `./gradlew build`             | Build everything                                                     |
-| `buildFatJar`                 | Build an executable JAR of the server with all dependencies included |
-| `buildImage`                  | Build the docker image to use with the fat JAR                       |
-| `publishImageToLocalRegistry` | Publish the docker image locally                                     |
-| `run`                         | Run the server                                                       |
-| `runDocker`                   | Run using the local docker image                                     |
+1. To build or run the project, use one of the following tasks:
+
+| Task              | Description                                                          |
+|-------------------|----------------------------------------------------------------------|
+| `./gradlew test`  | Run the tests                                                        |
+| `./gradlew build` | Build everything                                                     |
+| `./gradlew run`   | Run the server                                                       |
 
 If the server starts successfully, you'll see the following output:
 
@@ -43,13 +41,29 @@ If the server starts successfully, you'll see the following output:
 
 ## Sample requests
 
-curl -X GET http://localhost:8080/api/v1/meetings
+### Add meetings
 
-curl -X GET http://localhost:8080/api/v1/meetings/1
+curl -s -X POST -H "Accept: application/json" -H "Content-Type: application/json" --data \
+'{"id":null,"title":"Team Standup","date":"2025-03-14","start":"09:00:00","end":"09:30:00"}' \
+http://localhost:8080/api/scheduler/meetings | jq .
 
-curl -X POST http://localhost:8080/api/v1/meetings -d '{ "title" : "Lunch phone call",  "date" : "2025-03-13",  "start" : "12:00",  "end" : "12:30" }'
+curl -s -X POST -H "Accept: application/json" -H "Content-Type: application/json" --data \
+'{"id":null,"title":"Design Review","date":"2025-03-14","start":"10:00:00","end":"11:00:00"}' \
+http://localhost:8080/api/scheduler/meetings | jq .
 
-curl -X PUT http://localhost:8080/api/v1/meetings/1 -d '{ "id" : 1, "title" : "Lunch phone call",  "date" : "2025-03-11",  "start" : "12:00",  "end" : "13:00" }'
+curl -s -X POST -H "Accept: application/json" -H "Content-Type: application/json" --data \
+'{"id":null,"title":"Retrospective","date":"2025-03-14","start":"13:00:00","end":"15:00:00"}' \
+http://localhost:8080/api/scheduler/meetings | jq .
 
-curl -X DELETE http://localhost:8080/api/v1/meetings/1
+### Get all meetings
+
+curl -s -X GET http://localhost:8080/api/scheduler/meetings | jq .
+
+### Get one meeting
+
+curl -s -X GET http://localhost:8080/api/scheduler/meetings/1 | jq .
+
+### Get available meeting slots by specifying a meeting date and the meeting duration in minutes
+
+curl -s -X GET "http://localhost:8080/api/scheduler/meetings/find?date=2025-03-14&duration=45" | jq .
 
